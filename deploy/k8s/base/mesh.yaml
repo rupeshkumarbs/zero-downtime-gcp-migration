@@ -1,0 +1,56 @@
+# Cross-cloud routing for the cutover (full profile, Istio / Cloud Service Mesh).
+# The legacy AWS service is reached over HA VPN through a ServiceEntry, so the
+# mesh can mirror and weight traffic between AWS and GKE in one VirtualService.
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: orders-legacy
+  namespace: orders
+spec:
+  hosts:
+    - orders-legacy.orders.svc.cluster.local
+  location: MESH_EXTERNAL
+  resolution: DNS
+  ports:
+    - number: 443
+      name: https
+      protocol: TLS
+  endpoints:
+    - address: internal-orders-alb.aws.example.internal # AWS internal ALB, resolved via Cloud DNS forwarding
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: orders
+  namespace: orders
+spec:
+  host: orders.orders.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 200
+      http:
+        http2MaxRequests: 1000
+    outlierDetection: # eject a misbehaving pod before the SLO gate even fires
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  subsets:
+    - name: gcp
+      labels:
+        app: orders
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: orders-legacy
+  namespace: orders
+spec:
+  host: orders-legacy.orders.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      sni: internal-orders-alb.aws.example.internal

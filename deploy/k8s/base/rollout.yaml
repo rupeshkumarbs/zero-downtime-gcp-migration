@@ -1,0 +1,149 @@
+# In-cluster progressive delivery for releases *after* the migration:
+# Argo Rollouts shifts Istio weights and aborts automatically when the
+# Datadog SLO analysis fails (same SLOs as the cross-cloud cutover controller).
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: datadog-slo
+  namespace: orders
+spec:
+  args:
+    - name: service
+  metrics:
+    - name: error-rate
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      successCondition: default(result, 0) < 0.01
+      provider:
+        datadog:
+          apiVersion: v2
+          interval: 5m
+          queries:
+            errors: sum:trace.http.request.errors{service:{{args.service}},env:prod}.as_count()
+            hits: sum:trace.http.request.hits{service:{{args.service}},env:prod}.as_count()
+          formula: errors / hits
+    - name: p99-latency-ms
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      successCondition: default(result, 0) < 50
+      provider:
+        datadog:
+          apiVersion: v2
+          interval: 5m
+          queries:
+            p99: p99:trace.http.request.duration{service:{{args.service}},env:prod} * 1000
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: orders
+  namespace: orders
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: orders
+  template:
+    metadata:
+      labels:
+        app: orders
+        tags.datadoghq.com/service: orders
+        tags.datadoghq.com/env: prod
+    spec:
+      serviceAccountName: orders # bound to a GCP SA via Workload Identity
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: orders
+          image: asia-south1-docker.pkg.dev/PROJECT_ID/cutover/orders:REPLACE_ME
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+  strategy:
+    canary:
+      canaryService: orders-canary
+      stableService: orders-stable
+      trafficRouting:
+        istio:
+          virtualService:
+            name: orders-internal
+            routes:
+              - primary
+      steps:
+        - setWeight: 10
+        - analysis:
+            templates:
+              - templateName: datadog-slo
+            args:
+              - name: service
+                value: orders
+        - setWeight: 50
+        - pause:
+            duration: 10m
+        - analysis:
+            templates:
+              - templateName: datadog-slo
+            args:
+              - name: service
+                value: orders
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-stable
+  namespace: orders
+spec:
+  selector:
+    app: orders
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-canary
+  namespace: orders
+spec:
+  selector:
+    app: orders
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: orders-internal
+  namespace: orders
+spec:
+  hosts:
+    - orders.orders.svc.cluster.local
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: orders-stable
+          weight: 100
+        - destination:
+            host: orders-canary
+          weight: 0

@@ -1,0 +1,11 @@
+# Only the image build context is uploaded to Cloud Build.
+.git/
+.github/
+.venv/
+infra/
+deploy/
+docs/
+tests/
+out/
+**/__pycache__/
+*.md

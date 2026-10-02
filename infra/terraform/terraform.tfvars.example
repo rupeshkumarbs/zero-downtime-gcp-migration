@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+project_id = "my-gcp-project-id"
+region     = "asia-south1"
+profile    = "lean" # switch to "full" for the complete landing zone, then back to "lean"
+
+# Full path if an older gcloud is first on PATH (Windows example):
+# gcloud_bin = "C:/Users/<you>/tools/google-cloud-sdk/bin/gcloud.cmd"
+
+# full profile only:
+# gke_authorized_networks = [{ name = "my-laptop", cidr = "203.0.113.10/32" }]
+# access_policy_id        = "123456789012"   # org Access Context Manager policy
+# vpc_sc_enforce          = false            # dry-run first, enforce after reviewing logs
