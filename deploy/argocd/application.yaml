@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/OWNER/zero-downtime-gcp-migration.git
+    repoURL: https://github.com/rupeshkumarbs/zero-downtime-gcp-migration.git
     targetRevision: main
     path: deploy/k8s
     directory:

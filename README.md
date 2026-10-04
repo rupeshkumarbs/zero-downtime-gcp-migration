@@ -1,6 +1,6 @@
 # Zero-Downtime AWS → GCP Cutover Accelerator
 
-[![ci](https://github.com/OWNER/zero-downtime-gcp-migration/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/zero-downtime-gcp-migration/actions/workflows/ci.yml)
+[![ci](https://github.com/rupeshkumarbs/zero-downtime-gcp-migration/actions/workflows/ci.yml/badge.svg)](https://github.com/rupeshkumarbs/zero-downtime-gcp-migration/actions/workflows/ci.yml)
 
 A reference implementation for migrating a stateful, latency-sensitive service from AWS to GCP **with no downtime and no data loss**. It includes:
 
