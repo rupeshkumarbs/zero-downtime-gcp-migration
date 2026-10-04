@@ -1,4 +1,5 @@
 # Cutover accelerator image. Built remotely by Cloud Build (see infra/terraform/modules/accelerator).
+# checkov:skip=CKV_DOCKER_2:run-to-completion batch job (Cloud Run job); Cloud Run ignores Docker HEALTHCHECK and job success is the exit code
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
